@@ -15,10 +15,7 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.PluginRegistry.Registrar
 import java.math.BigInteger
 import java.nio.charset.Charset
-import java.security.Key
-import java.security.KeyPairGenerator
-import java.security.KeyStore
-import java.security.SecureRandom
+import java.security.*
 import java.security.spec.AlgorithmParameterSpec
 import java.util.*
 import javax.crypto.Cipher
@@ -50,7 +47,7 @@ class RsaKeyStoreKeyWrapper(context: Context) : KeyWrapper {
 
     @Throws(Exception::class)
     override fun wrap(key: Key): ByteArray {
-        val publicKey = getEntry().certificate.publicKey
+        val publicKey = getPublicEntry()
         val cipher = getRSACipher()
         cipher.init(Cipher.WRAP_MODE, publicKey)
         return cipher.wrap(key)
@@ -58,7 +55,7 @@ class RsaKeyStoreKeyWrapper(context: Context) : KeyWrapper {
 
     @Throws(Exception::class)
     override fun unwrap(wrappedKey: ByteArray, algorithm: String): Key {
-        val privateKey = getEntry().privateKey
+        val privateKey = getPrivateEntry()
         val cipher = getRSACipher()
         cipher.init(Cipher.UNWRAP_MODE, privateKey)
 
@@ -67,7 +64,7 @@ class RsaKeyStoreKeyWrapper(context: Context) : KeyWrapper {
 
     @Throws(Exception::class)
     fun encrypt(input: ByteArray): ByteArray {
-        val publicKey = getEntry().certificate.publicKey
+        val publicKey = getPublicEntry()
         val cipher = getRSACipher()
         cipher.init(Cipher.ENCRYPT_MODE, publicKey)
 
@@ -76,7 +73,7 @@ class RsaKeyStoreKeyWrapper(context: Context) : KeyWrapper {
 
     @Throws(Exception::class)
     fun decrypt(input: ByteArray): ByteArray {
-        val privateKey = getEntry().privateKey
+        val privateKey = getPrivateEntry()
         val cipher = getRSACipher()
         cipher.init(Cipher.DECRYPT_MODE, privateKey)
 
@@ -84,13 +81,32 @@ class RsaKeyStoreKeyWrapper(context: Context) : KeyWrapper {
     }
 
     @Throws(Exception::class)
-    private fun getEntry(): KeyStore.PrivateKeyEntry {
+    private fun getPublicEntry(): PublicKey {
         val ks = KeyStore.getInstance(KEYSTORE_PROVIDER_ANDROID)
         ks.load(null)
 
-        return (ks.getEntry(keyAlias, null)
-                ?: throw Exception("No key found under alias: $keyAlias")) as? KeyStore.PrivateKeyEntry
-                ?: throw Exception("Not an instance of a PrivateKeyEntry")
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            return ks.getCertificate(keyAlias).publicKey
+        }
+        val asymmetricKey = ks.getEntry(keyAlias, null) as KeyStore.PrivateKeyEntry
+        return asymmetricKey.certificate.publicKey
+
+
+    }
+
+    @Throws(Exception::class)
+    private fun getPrivateEntry(): PrivateKey {
+        val ks = KeyStore.getInstance(KEYSTORE_PROVIDER_ANDROID)
+        ks.load(null)
+
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            return ks.getKey(keyAlias, null) as PrivateKey
+        }
+        val asymmetricKey = ks.getEntry(keyAlias, null) as KeyStore.PrivateKeyEntry
+        return asymmetricKey.privateKey
+
     }
 
     @Throws(Exception::class)
@@ -107,10 +123,10 @@ class RsaKeyStoreKeyWrapper(context: Context) : KeyWrapper {
         val ks = KeyStore.getInstance(KEYSTORE_PROVIDER_ANDROID)
         ks.load(null)
 
-        var entry: KeyStore.Entry? = null
+        var entry: Key? = null
         for (i in 1..5) {
             try {
-                entry = ks.getEntry(keyAlias, null);
+                entry = getPrivateEntry();
                 break;
             } catch (ignored: Exception) {
             }
@@ -119,7 +135,7 @@ class RsaKeyStoreKeyWrapper(context: Context) : KeyWrapper {
         if (entry == null) {
             createKeys();
             try {
-                entry = ks.getEntry(keyAlias, null);
+                entry = getPrivateEntry();
             } catch (ignored: Exception) {
                 ks.deleteEntry(keyAlias);
             }
@@ -257,62 +273,3 @@ class KeyStoreHelper
         return String(outputBytes, charset)
     }
 }
-
-// class FlutterKeychainPlugin : MethodCallHandler {
-
-//     companion object {
-//         lateinit private var encryptor: StringEncryptor;
-//         lateinit private var preferences: SharedPreferences;
-
-//         @JvmStatic
-//         fun registerWith(registrar: Registrar): Unit {
-
-//             try {
-//                 preferences = registrar.context().getSharedPreferences("FlutterKeychain", Context.MODE_PRIVATE);
-//                 encryptor = AesStringEncryptor(preferences = preferences, keyWrapper = RsaKeyStoreKeyWrapper(registrar.context()));
-
-//                 val channel = MethodChannel(registrar.messenger(), "plugin.appmire.be/flutter_keychain")
-//                 channel.setMethodCallHandler(FlutterKeychainPlugin())
-//             } catch (e: Exception) {
-//                 Log.e("flutter_keychain", "Could not register plugin", e)
-//             }
-//         }
-//     }
-
-//     fun MethodCall.key(): String? {
-//         return this.argument("key")
-//     }
-
-//     fun MethodCall.value(): String? {
-//         return this.argument("value")
-//     }
-
-//     override fun onMethodCall(call: MethodCall, result: Result): Unit {
-//         try {
-//             when (call.method) {
-//                 "get" -> {
-//                     val encryptedValue: String? = preferences.getString(call.key(), null)
-//                     val value = encryptor.decrypt(encryptedValue)
-//                     result.success(value)
-//                 }
-//                 "put" -> {
-//                     val value = encryptor.encrypt(call.value())
-//                     preferences.edit().putString(call.key(), value).commit()
-//                     result.success(null)
-//                 }
-//                 "remove" -> {
-//                     preferences.edit().remove(call.key()).commit()
-//                     result.success(null)
-//                 }
-//                 "clear" -> {
-//                     preferences.edit().clear().commit()
-//                     result.success(null)
-//                 }
-//                 else -> result.notImplemented()
-//             }
-//         } catch (e: Exception) {
-//             Log.e("flutter_keychain", e.message)
-//             result.error("flutter_keychain", e.message, e)
-//         }
-//     }
-// }

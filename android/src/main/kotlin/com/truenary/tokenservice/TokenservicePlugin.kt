@@ -8,7 +8,7 @@ import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.plugin.common.PluginRegistry.Registrar
 
-class tokenservicePlugin: MethodCallHandler {
+class TokenServicePlugin: MethodCallHandler {
 
   private val serverName = "tokenservice.truenary.com"
   private val accessTokenLabel = "ACCESS_TOKEN"
@@ -23,7 +23,7 @@ class tokenservicePlugin: MethodCallHandler {
     @JvmStatic
     fun registerWith(registrar: Registrar) {
       val channel = MethodChannel(registrar.messenger(), "tokenservice.truenary.com/tokens")
-      channel.setMethodCallHandler(tokenservicePlugin())
+      channel.setMethodCallHandler(TokenServicePlugin())
       instance = registrar
     }
   }

@@ -1,4 +1,4 @@
-name: tokenservice_example
+name: token_service_example
 description: Demonstrates how to use the tokenservice plugin.
 publish_to: 'none'
 

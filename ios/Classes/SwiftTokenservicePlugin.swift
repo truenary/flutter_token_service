@@ -6,10 +6,7 @@ import Foundation
 
   static let serverName: String = "tokenservice.truenary.com"
 
-  static let accessTokenLabel: String = "ACCESS_TOKEN"
-  static let refreshTokenLabel: String = "REFRESH_TOKEN"
-
-  let tokenService: TokenService = TokenService.init(serverName: SwiftTokenServicePlugin.serverName, accessTokenLabel: SwiftTokenServicePlugin.accessTokenLabel, refreshTokenLabel: SwiftTokenServicePlugin.refreshTokenLabel)
+  let tokenService: TokenService = TokenService.init(serverName: SwiftTokenServicePlugin.serverName)
 
   public static func register(with registrar: FlutterPluginRegistrar) {
     let channel = FlutterMethodChannel(name: "\(SwiftTokenServicePlugin.serverName)/tokens", binaryMessenger: registrar.messenger())
@@ -25,7 +22,9 @@ import Foundation
       case "getAccessToken": result(try self.tokenService.getAccessToken())
       case "getRefreshToken": result(try self.tokenService.getRefreshToken())
       case "addOrUpdateAccessToken": result(try self.tokenService.addOrUpdateAccessToken(token: call.arguments as! String))
+      case "addOrUpdateRefreshToken": result(try self.tokenService.addOrUpdateRefreshToken(token: call.arguments as! String))
       case "deleteAccessToken": result(try self.tokenService.deleteAccessToken())
+      case "deleteRefreshToken": result(try self.tokenService.deleteRefreshToken())
       default: result(FlutterMethodNotImplemented)
       }
     } catch TokenKeychainError.corruptData {
@@ -41,6 +40,11 @@ import Foundation
   }
 }
 
+enum TokenType {
+  case AccessToken
+  case RefreshToken
+}
+
 enum TokenKeychainError: Error {
   case noToken
   case corruptData
@@ -49,34 +53,34 @@ enum TokenKeychainError: Error {
 
 class TokenService {
   let serverName: String
-  let accessTokenLabel: String
-  let refreshTokenLabel: String
 
-  let baseQuery: [String: Any]
+  let accessTokenQuery: [String: Any]
+  let refreshTokenQuery: [String: Any]
 
-  init(serverName: String, accessTokenLabel: String, refreshTokenLabel: String) {
+  init(serverName: String) {
     self.serverName = serverName
-    self.accessTokenLabel = accessTokenLabel
-    self.refreshTokenLabel = refreshTokenLabel
 
-    self.baseQuery = [
+    self.accessTokenQuery = [
       kSecClass as String: kSecClassInternetPassword,
-      kSecAttrServer as String: self.serverName,
+      kSecAttrServer as String: "\(self.serverName)/access",
+      kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked
+    ]
+    self.refreshTokenQuery = [
+      kSecClass as String: kSecClassInternetPassword,
+      kSecAttrServer as String: "\(self.serverName)/refresh",
       kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked
     ]
   }
 
   private func buildAccessTokenQuery() -> [String: Any] {
-    return self.baseQuery.merging([
+    return self.accessTokenQuery.merging([
       kSecMatchLimit as String: kSecMatchLimitOne,
-      kSecAttrLabel as String: self.accessTokenLabel
     ]) {(_, new) in new}
   }
 
   private func buildRefreshTokenQuery() -> [String: Any] {
-    return self.baseQuery.merging([
+    return self.refreshTokenQuery.merging([
       kSecMatchLimitOne as String: kSecMatchLimitOne,
-      kSecAttrLabel as String: self.refreshTokenLabel
     ]) {(_, new) in new}
   }
 
@@ -102,14 +106,20 @@ class TokenService {
     return token
   }
 
-  private func addOrUpdateToken(token: String, label: String) throws -> NSNumber {
+  private func addOrUpdateToken(token: String, tokenType: TokenType) throws -> NSNumber {
     let attribute: [String: Any] = [
       kSecAttrAccount as String: "api",
       kSecValueData as String: token.data(using: String.Encoding.utf8)!,
     ]
-    let matchQuery: [String: Any] = self.baseQuery.merging([
-      kSecAttrLabel as String: label
-    ]){(_, new) in new}
+    var matchQuery: [String: Any]
+    switch tokenType {
+    case TokenType.AccessToken:
+      matchQuery = self.accessTokenQuery
+      break
+    case TokenType.RefreshToken:
+      matchQuery = self.refreshTokenQuery
+      break
+    }
 
     let updateStatus = SecItemUpdate(matchQuery as CFDictionary, attribute as CFDictionary)
     guard updateStatus != errSecSuccess else {
@@ -130,10 +140,16 @@ class TokenService {
     throw TokenKeychainError.unhandledError(error: updateStatus)
   }
 
-  private func deleteToken(label: String) throws -> NSNumber {
-    let matchQuery: [String: Any] = self.baseQuery.merging([
-      kSecAttrLabel as String: label
-    ]){(_, new) in new}
+  private func deleteToken(tokenType: TokenType) throws -> NSNumber {
+    var matchQuery: [String: Any]
+    switch tokenType {
+    case TokenType.AccessToken:
+      matchQuery = self.accessTokenQuery
+      break
+    case TokenType.RefreshToken:
+      matchQuery = self.refreshTokenQuery
+      break
+    }
     let deleteStatus = SecItemDelete(matchQuery as CFDictionary)
     guard deleteStatus == errSecSuccess || deleteStatus == errSecItemNotFound else {
       throw TokenKeychainError.unhandledError(error: deleteStatus)
@@ -145,9 +161,9 @@ class TokenService {
   func getAccessToken() throws -> String? { return try self.getToken(query: self.buildAccessTokenQuery()) }
   func getRefreshToken() throws -> String? { return try self.getToken(query: self.buildRefreshTokenQuery()) }
 
-  func addOrUpdateAccessToken(token: String) throws -> NSNumber { return try self.addOrUpdateToken(token: token, label: self.accessTokenLabel) }
-  func addOrUpdateRefreshToken(token: String) throws -> NSNumber { return try self.addOrUpdateToken(token: token, label: self.refreshTokenLabel) }
+  func addOrUpdateAccessToken(token: String) throws -> NSNumber { return try self.addOrUpdateToken(token: token, tokenType: TokenType.AccessToken) }
+  func addOrUpdateRefreshToken(token: String) throws -> NSNumber { return try self.addOrUpdateToken(token: token, tokenType: TokenType.RefreshToken) }
 
-  func deleteAccessToken() throws -> NSNumber { return try self.deleteToken(label: self.accessTokenLabel) }
-  func deleteRefreshToken() throws -> NSNumber { return try self.deleteToken(label: self.refreshTokenLabel) }
+  func deleteAccessToken() throws -> NSNumber { return try self.deleteToken(tokenType: TokenType.AccessToken) }
+  func deleteRefreshToken() throws -> NSNumber { return try self.deleteToken(tokenType: TokenType.RefreshToken) }
 }

@@ -12,29 +12,54 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  String token = 'ejolvnwjaewbeacknhuw4443y92oq';
+  String accessToken = 'accesswjaewbeacknhuw4443y92oq';
+  String refreshToken = 'refreshwjaewbeacknhuw4443y92oq';
 
   String msg = '';
 
   TokenService tokenservice = TokenService();
-  addToken() async {
-    tokenservice.addOrUpdateAccessToken(token).then((_) {
+  addAccessToken() async {
+    tokenservice.addOrUpdateAccessToken(accessToken).then((_) {
       setState(() {
         msg = 'Token Stored';
       });
     });
   }
 
-  deleteToken() async {
-    tokenservice.deleteAccessToken().then((_) {
+  addRefreshToken() async {
+    tokenservice.addOrUpdateRefreshToken(refreshToken).then((_) {
       setState(() {
-        msg = 'Token Deleted';
+        msg = 'Refresh Token Stored';
       });
     });
   }
 
-  getToken() async {
+  deleteAccessToken() async {
+    tokenservice.deleteAccessToken().then((_) {
+      setState(() {
+        msg = 'Access Token Deleted';
+      });
+    });
+  }
+
+  deleteRefreshToken() async {
+    tokenservice.deleteRefreshToken().then((_) {
+      setState(() {
+        msg = 'Refresh Token Deleted';
+      });
+    });
+  }
+
+  getAccessToken() async {
     tokenservice.getAccessToken().then((val) {
+      setState(() {
+        msg = val ?? 'Not Token Stored';
+      });
+    });
+  }
+
+  getRefreshToken() async {
+    tokenservice.getRefreshToken().then((val) {
       setState(() {
         msg = val ?? 'Not Token Stored';
       });
@@ -52,16 +77,29 @@ class _MyAppState extends State<MyApp> {
           children: <Widget>[
             Container(
               child:
-                  RaisedButton(child: Text('Add Token'), onPressed: addToken),
+                  RaisedButton(child: Text('Add Access Token'), onPressed: addAccessToken),
             ),
             Container(
               child:
-                  RaisedButton(child: Text('Get Token'), onPressed: getToken),
+                  RaisedButton(child: Text('Get Access Token'), onPressed: getAccessToken),
             ),
             Container(
                 child: RaisedButton(
-              child: Text('Delete Token'),
-              onPressed: deleteToken,
+              child: Text('Delete Access Token'),
+              onPressed: deleteAccessToken,
+            )),
+            Container(
+              child:
+                  RaisedButton(child: Text('Add Refresh Token'), onPressed: addRefreshToken),
+            ),
+            Container(
+              child:
+                  RaisedButton(child: Text('Get Refresh Token'), onPressed: getRefreshToken),
+            ),
+            Container(
+                child: RaisedButton(
+              child: Text('Delete Refresh Token'),
+              onPressed: deleteRefreshToken,
             )),
             Container(
               margin: EdgeInsets.only(top: 25),

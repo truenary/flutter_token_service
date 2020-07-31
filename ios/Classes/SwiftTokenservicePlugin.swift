@@ -95,7 +95,9 @@ class TokenService {
       return nil
     }
     guard status == errSecSuccess else {
-      throw TokenKeychainError.unhandledError(error: status)
+      // can be accessing when phone is in locked state, e.g: VOIP
+      NSLog("[flutter_token_service] error on reading token, sending null")
+      return nil
     }
 
     guard let existingItem = item as? [String : Any],

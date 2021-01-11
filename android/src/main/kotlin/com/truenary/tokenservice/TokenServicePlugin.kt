@@ -2,30 +2,45 @@ package com.truenary.tokenservice
 
 import android.os.Build;
 
+import android.content.Context
+import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.plugin.common.PluginRegistry.Registrar
+import io.flutter.embedding.engine.plugins.FlutterPlugin
 
-class TokenServicePlugin: MethodCallHandler {
+class TokenServicePlugin: MethodCallHandler, FlutterPlugin {
 
   private val serverName = "tokenservice.truenary.com"
   private val accessTokenLabel = "ACCESS_TOKEN"
   private val refreshTokenLabel = "REFRESH_TOKEN"
-
-
+  private var methodChannel: MethodChannel? = null
+  private var applicationContext: Context? = null
 
   companion object {
     @JvmStatic
-    public var instance: Registrar? = null
-
-    @JvmStatic
     fun registerWith(registrar: Registrar) {
-      val channel = MethodChannel(registrar.messenger(), "tokenservice.truenary.com/tokens")
-      channel.setMethodCallHandler(TokenServicePlugin())
-      instance = registrar
+      val pluginInstance = TokenServicePlugin()
+      pluginInstance.onAttachedToEngine(registrar.context(), registrar.messenger())
     }
+  }
+
+  override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+    onAttachedToEngine(binding.getApplicationContext(), binding.getBinaryMessenger())
+  }
+
+  private fun onAttachedToEngine(context: Context, messenger: BinaryMessenger) {
+    applicationContext = context
+    methodChannel = MethodChannel(messenger, "tokenservice.truenary.com/tokens")
+    methodChannel!!.setMethodCallHandler(this)
+  }
+
+  override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+    applicationContext = null
+    methodChannel!!.setMethodCallHandler(null)
+    methodChannel = null
   }
 
   override fun onMethodCall(call: MethodCall, result: Result) {
@@ -36,7 +51,7 @@ class TokenServicePlugin: MethodCallHandler {
   private fun handlePlatformSpecificCall(call: MethodCall, result:Result):Result {
     try {
 
-      val tokenservice: tokenservice = tokenservice(serverName, accessTokenLabel, refreshTokenLabel, instance!!.context())
+      val tokenservice: tokenservice = tokenservice(serverName, accessTokenLabel, refreshTokenLabel, applicationContext!!)
 
       if (call.method == "getAccessToken") {
         result.success(tokenservice.getAccessToken())

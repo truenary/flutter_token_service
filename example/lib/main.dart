@@ -4,7 +4,11 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:token_service/token_service.dart';
 
-void main() => runApp(MyApp());
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  runApp(MyApp());
+}
 
 class MyApp extends StatefulWidget {
   @override
